@@ -8,9 +8,8 @@ void main() {
     SalesOrderStore.instance.api = MockSalesOrderApi(
       simulatedLatency: Duration.zero,
     );
-    SalesOrderStore.instance.overview = null;
-    SalesOrderStore.instance.recentOrders = const [];
     SalesOrderStore.instance.profile = null;
+    SalesOrderStore.instance.clearCart();
   });
   test('MockSalesOrderApi CRUD, filter, search, and pagination work', () async {
     final api = MockSalesOrderApi(simulatedLatency: Duration.zero);
@@ -57,14 +56,14 @@ void main() {
     expect(updatedOverview.completedOrders, 217);
   });
 
-  testWidgets('OrderlyApp renders Home and navigates to Orders & Create Order',
+  testWidgets('OrderlyApp renders Products as home and navigates to Orders & Create Order',
       (WidgetTester tester) async {
     await tester.pumpWidget(const OrderlyApp());
     await tester.pumpAndSettle();
 
-    expect(find.text('ORDERLY'), findsOneWidget);
-    expect(find.text('Good morning, Alex'), findsOneWidget);
-    expect(find.text('Recent orders'), findsOneWidget);
+    expect(find.text('Products'), findsWidgets);
+    expect(find.text('Tap a product to add it to your cart.'), findsOneWidget);
+    expect(find.text('Wireless mouse'), findsOneWidget);
 
     await tester.tap(find.text('Orders').last);
     await tester.pumpAndSettle();
@@ -72,10 +71,9 @@ void main() {
     expect(find.text('Order history'), findsOneWidget);
     expect(find.text('WORKSPACE'), findsOneWidget);
 
-    await tester.tap(find.byIcon(Icons.arrow_back).first);
+    await tester.tap(find.byIcon(Icons.more_horiz).first);
     await tester.pumpAndSettle();
-
-    await tester.tap(find.text('Create new order'));
+    await tester.tap(find.text('Create new sales order'));
     await tester.pumpAndSettle();
 
     expect(find.text('Create sales order'), findsOneWidget);
@@ -87,14 +85,27 @@ void main() {
     expect(find.text('Add at least one product to continue.'), findsOneWidget);
   });
 
-  testWidgets('Full end-to-end order creation, summary, and confirmation flow',
+  testWidgets('Add multiple products to cart and order all end-to-end',
       (WidgetTester tester) async {
     await tester.pumpWidget(const OrderlyApp());
     await tester.pumpAndSettle();
 
-    // Navigate to Create Order
-    await tester.tap(find.text('Create new order'));
+    // Add two products to cart on Products page
+    await tester.tap(find.text('Wireless mouse'));
     await tester.pumpAndSettle();
+    await tester.tap(find.text('Mechanical keyboard'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('2 items in cart'), findsOneWidget);
+    expect(find.text('Order all'), findsOneWidget);
+
+    // Proceed to Create Order with all cart products
+    await tester.tap(find.text('Order all'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Create sales order'), findsOneWidget);
+    expect(find.text('Wireless mouse'), findsOneWidget);
+    expect(find.text('Mechanical keyboard'), findsOneWidget);
 
     // Select customer
     await tester.tap(find.text('Choose a customer'));
@@ -104,18 +115,6 @@ void main() {
 
     expect(find.text('Priya Sharma'), findsOneWidget);
 
-    // Add a product
-    final addProductBtn = find.text('+  Add product');
-    await tester.ensureVisible(addProductBtn);
-    await tester.pumpAndSettle();
-    await tester.tap(addProductBtn);
-    await tester.pumpAndSettle();
-    await tester.tap(find.text('Wireless mouse').last);
-    await tester.pumpAndSettle();
-
-    expect(find.text('Wireless mouse'), findsOneWidget);
-    expect(find.text('Saved as draft'), findsOneWidget);
-
     // Go to Order Summary
     await tester.tap(find.text('Review order'));
     await tester.pumpAndSettle();
@@ -124,7 +123,7 @@ void main() {
     expect(find.text('Everything look right?'), findsOneWidget);
     expect(find.text('Confirming changes this order to Confirmed.'), findsOneWidget);
 
-    // Confirm Order -> Order Details
+    // Confirm Order -> Order Details & cart cleared
     await tester.tap(find.text('Confirm order'));
     await tester.pumpAndSettle();
 
@@ -132,6 +131,7 @@ void main() {
     expect(find.text('Order confirmed successfully'), findsOneWidget);
     expect(find.text('Your order is ready for processing.'), findsOneWidget);
     expect(find.text('Create another order'), findsOneWidget);
+    expect(SalesOrderStore.instance.cartItems, isEmpty);
   });
 
   test('ApiConfig resolves a valid base URL', () {
